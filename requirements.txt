@@ -1,7 +1,7 @@
 fastapi
 uvicorn
-pydantic
-python-dotenv
-google-genai
 supabase
-requests
+google-genai
+python-dotenv
+pydantic[email]
+email-validator
