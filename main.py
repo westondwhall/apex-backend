@@ -371,7 +371,7 @@ def chat(request: ChatRequest, current_user_id: Annotated[str, Depends(get_curre
         supabase.table("chat_messages").insert({"user_id": current_user_id, "role": "user", "message": request.message}).execute()
 
         response = gemini_client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="models/gemini-3.6-flash",
             contents=full_prompt,
             config={"system_instruction": system_instruction}
         )
@@ -423,7 +423,7 @@ def generate_workout_plan(request: WorkoutPlanRequest, current_user_id: Annotate
         """
         contents = [f for f in rag_files] + [prompt]
         response = gemini_client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="models/gemini-3.6-flash",
             contents=contents,
             config=types.GenerateContentConfig(system_instruction=APEX_SYSTEM_INSTRUCTION)
         )
