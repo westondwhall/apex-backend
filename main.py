@@ -19,7 +19,7 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 # Safety check for environment variables
 if not GEMINI_API_KEY or not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError("Missing critical environment variables. Check your .env file!")
+    raise ValueError("Missing critical environment variables. Check your .env file or Render configuration!")
 
 # 2. Initialize Clients
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
@@ -55,6 +55,7 @@ def get_current_user(credentials: Annotated[HTTPAuthorizationCredentials, Depend
             raise HTTPException(status_code=401, detail="Invalid or expired token")
         return user.user.id
     except Exception as e:
+        print(f"TOKEN VALIDATION ERROR: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
 
 # --- Request Schemas ---
@@ -190,6 +191,7 @@ def signup(request: SignupRequest):
         supabase.table("profiles").upsert(profile_data, on_conflict="user_id").execute()
         return {"status": "User registered and profile initialized successfully", "user_id": user_id}
     except Exception as e:
+        print(f"SIGNUP ERROR: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/auth/login")
@@ -205,7 +207,8 @@ def login(credentials: AuthRequest):
             "user_id": response.user.id
         }
     except Exception as e:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        print(f"REAL LOGIN ERROR: {str(e)}") # Prints detailed reason to Render logs
+        raise HTTPException(status_code=401, detail=f"Login failed: {str(e)}")
 
 @app.delete("/auth/account")
 def delete_user_account(current_user_id: Annotated[str, Depends(get_current_user)]):
@@ -378,6 +381,7 @@ def chat(request: ChatRequest, current_user_id: Annotated[str, Depends(get_curre
 
         return {"response": model_reply, "profile_context_applied": bool(profile_data), "history_length_included": len(past_messages)}
     except Exception as e:
+        print(f"CHAT ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/chat-history")
@@ -425,6 +429,7 @@ def generate_workout_plan(request: WorkoutPlanRequest, current_user_id: Annotate
         )
         return {"status": "success", "workout_plan": response.text}
     except Exception as e:
+        print(f"GENERATE PLAN ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/save-plan")
