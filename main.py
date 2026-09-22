@@ -25,6 +25,9 @@ if not GEMINI_API_KEY or not SUPABASE_URL or not SUPABASE_KEY:
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# Default full equipment string used when user leaves equipment empty/blank
+DEFAULT_FULL_EQUIPMENT = "Full Commercial Gym, Barbell, Dumbbells, Kettlebells, Pull-up Bar, Ruck Plate, Rowing Machine, Assault Bike, Track/Road"
+
 APEX_SYSTEM_INSTRUCTION = """
 You are Apex: a supportive, disciplined, peer-to-peer military mentor and tactical performance coach.
 Your voice is direct, grounded, concise, and candid. Treat the user as an equal teammate.
@@ -173,6 +176,8 @@ def signup(request: SignupRequest):
         if not user_id:
             raise HTTPException(status_code=400, detail="Failed to create user account.")
 
+        resolved_equipment = request.equipment if (request.equipment and request.equipment.strip()) else DEFAULT_FULL_EQUIPMENT
+
         profile_data = {
             "user_id": user_id,
             "full_name": request.full_name,
@@ -183,7 +188,7 @@ def signup(request: SignupRequest):
             "physical_metrics": request.physical_metrics,
             "core_stats": request.core_stats,
             "injuries_limitations": request.injuries_limitations,
-            "equipment": request.equipment,
+            "equipment": resolved_equipment,
             "terms_accepted": request.terms_accepted,
             "billing_accepted": request.billing_accepted,
             "privacy_accepted": request.privacy_accepted
@@ -238,6 +243,8 @@ def get_profile(current_user_id: Annotated[str, Depends(get_current_user)]):
 @app.post("/profile")
 def save_profile(profile: UserProfile, current_user_id: Annotated[str, Depends(get_current_user)]):
     try:
+        resolved_equipment = profile.equipment if (profile.equipment and profile.equipment.strip()) else DEFAULT_FULL_EQUIPMENT
+
         data = {
             "user_id": current_user_id,
             "full_name": profile.full_name,
@@ -250,7 +257,7 @@ def save_profile(profile: UserProfile, current_user_id: Annotated[str, Depends(g
             "physical_metrics": profile.physical_metrics,
             "core_stats": profile.core_stats,
             "injuries_limitations": profile.injuries_limitations,
-            "equipment": profile.equipment,
+            "equipment": resolved_equipment,
             "terms_accepted": profile.terms_accepted,
             "billing_accepted": profile.billing_accepted,
             "privacy_accepted": profile.privacy_accepted
@@ -342,6 +349,10 @@ def chat(request: ChatRequest, current_user_id: Annotated[str, Depends(get_curre
         plan_summary = active_plan.get('plan_text', 'No active plan saved.') if active_plan else 'None'
 
         if profile_data:
+            user_equipment = profile_data.get('equipment')
+            if not user_equipment or not user_equipment.strip():
+                user_equipment = DEFAULT_FULL_EQUIPMENT
+
             system_instruction = (
                 f"You are the Apex Tactical Fitness AI Coach. "
                 f"Client Name: {profile_data.get('full_name', 'User')}. "
@@ -353,7 +364,7 @@ def chat(request: ChatRequest, current_user_id: Annotated[str, Depends(get_curre
                 f"Physical Metrics: {profile_data.get('physical_metrics', 'Not specified')}. "
                 f"Core Stats: {profile_data.get('core_stats', 'Not specified')}. "
                 f"Injuries & Limitations: {profile_data.get('injuries_limitations', profile_data.get('medical_limitations', 'None'))}. "
-                f"Available Equipment: {profile_data.get('equipment', 'Standard gym/bodyweight')}. \n\n"
+                f"Available Equipment: {user_equipment}. \n\n"
                 f"RECENT WORKOUT LOGS:\n{logs_summary if logs_summary else 'No recent logs found.'}\n\n"
                 f"ACTIVE TRAINING PLAN SUMMARY:\n{plan_summary[:500]}...\n\n"
                 f"Tailor all training advice specifically to their target agency requirements, sport-specific athletic background, experience level, training frequency, physical metrics, core stats, available equipment, recent performance trends, and medical/injury limitations."
@@ -408,6 +419,10 @@ def generate_workout_plan(request: WorkoutPlanRequest, current_user_id: Annotate
         profile_response = supabase.table("profiles").select("*").eq("user_id", current_user_id).execute()
         profile_data = profile_response.data[0] if profile_response.data else {}
 
+        user_equipment = profile_data.get('equipment')
+        if not user_equipment or not user_equipment.strip():
+            user_equipment = DEFAULT_FULL_EQUIPMENT
+
         rag_files = list(gemini_client.files.list())
         prompt = f"""
         Generate a structured, {request.timeline_weeks}-week tactical fitness conditioning program 
@@ -416,7 +431,7 @@ def generate_workout_plan(request: WorkoutPlanRequest, current_user_id: Annotate
         - Physical Metrics: {profile_data.get('physical_metrics', 'Not specified')}
         - Core Stats: {profile_data.get('core_stats', 'Not specified')}
         - Injuries/Limitations: {profile_data.get('injuries_limitations', profile_data.get('medical_limitations', 'None'))}
-        - Equipment Available: {profile_data.get('equipment', 'Standard gym')}
+        - Equipment Available: {user_equipment}
         
         Use the provided tactical documents as ground truth for standards, protocols, and performance thresholds.
         Return the response with clear weekly progression, exercises, sets, reps, and rest intervals, strictly adapting to their equipment and physical/injury limitations.
