@@ -251,8 +251,8 @@ def save_profile(profile: UserProfile, current_user_id: Annotated[str, Depends(g
             "target_agency": profile.target_agency,
             "fitness_goals": profile.fitness_goals,
             "medical_limitations": profile.medical_limitations,
-            "experience_level": profile.experience_level,
-            "training_days_per_week": profile.training_days_per_week,
+            "experience_level": profile.experience_level or "Intermediate",
+            "training_days_per_week": profile.training_days_per_week or 4,
             "sports": profile.sports,
             "physical_metrics": profile.physical_metrics,
             "core_stats": profile.core_stats,
@@ -265,6 +265,7 @@ def save_profile(profile: UserProfile, current_user_id: Annotated[str, Depends(g
         response = supabase.table("profiles").upsert(data, on_conflict="user_id").execute()
         return {"status": "Profile saved successfully", "data": response.data}
     except Exception as e:
+        print(f"SAVE PROFILE ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- Personal Records Endpoints ---
