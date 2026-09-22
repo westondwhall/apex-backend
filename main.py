@@ -63,9 +63,9 @@ def get_current_user(credentials: Annotated[HTTPAuthorizationCredentials, Depend
 
 # --- Request Schemas ---
 class UserProfile(BaseModel):
-    full_name: str
-    target_agency: str
-    fitness_goals: str
+    full_name: Optional[str] = "Operator"
+    target_agency: Optional[str] = "General Tactical"
+    fitness_goals: Optional[str] = "General Conditioning"
     medical_limitations: Optional[str] = None
     experience_level: Optional[str] = "Intermediate"
     training_days_per_week: Optional[int] = 4
@@ -74,9 +74,9 @@ class UserProfile(BaseModel):
     core_stats: Optional[str] = None
     injuries_limitations: Optional[str] = None
     equipment: Optional[str] = None
-    terms_accepted: bool = True
-    billing_accepted: bool = True
-    privacy_accepted: bool = True
+    terms_accepted: Optional[bool] = True
+    billing_accepted: Optional[bool] = True
+    privacy_accepted: Optional[bool] = True
 
 class SignupRequest(BaseModel):
     email: EmailStr
@@ -212,7 +212,7 @@ def login(credentials: AuthRequest):
             "user_id": response.user.id
         }
     except Exception as e:
-        print(f"REAL LOGIN ERROR: {str(e)}") # Prints detailed reason to Render logs
+        print(f"REAL LOGIN ERROR: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Login failed: {str(e)}")
 
 @app.delete("/auth/account")
@@ -247,20 +247,20 @@ def save_profile(profile: UserProfile, current_user_id: Annotated[str, Depends(g
 
         data = {
             "user_id": current_user_id,
-            "full_name": profile.full_name,
-            "target_agency": profile.target_agency,
-            "fitness_goals": profile.fitness_goals,
+            "full_name": profile.full_name or "Operator",
+            "target_agency": profile.target_agency or "General Tactical",
+            "fitness_goals": profile.fitness_goals or "General Conditioning",
             "medical_limitations": profile.medical_limitations,
             "experience_level": profile.experience_level or "Intermediate",
-            "training_days_per_week": profile.training_days_per_week or 4,
+            "training_days_per_week": profile.training_days_per_week if profile.training_days_per_week is not None else 4,
             "sports": profile.sports,
             "physical_metrics": profile.physical_metrics,
             "core_stats": profile.core_stats,
             "injuries_limitations": profile.injuries_limitations,
             "equipment": resolved_equipment,
-            "terms_accepted": profile.terms_accepted,
-            "billing_accepted": profile.billing_accepted,
-            "privacy_accepted": profile.privacy_accepted
+            "terms_accepted": profile.terms_accepted if profile.terms_accepted is not None else True,
+            "billing_accepted": profile.billing_accepted if profile.billing_accepted is not None else True,
+            "privacy_accepted": profile.privacy_accepted if profile.privacy_accepted is not None else True
         }
         response = supabase.table("profiles").upsert(data, on_conflict="user_id").execute()
         return {"status": "Profile saved successfully", "data": response.data}
