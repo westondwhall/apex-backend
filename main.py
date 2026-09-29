@@ -225,6 +225,10 @@ def delete_user_account(current_user_id: Annotated[str, Depends(get_current_user
         supabase.table("chat_messages").delete().eq("user_id", current_user_id).execute()
         supabase.table("personal_records").delete().eq("user_id", current_user_id).execute()
         supabase.table("agency_benchmarks").delete().eq("user_id", current_user_id).execute()
+        
+        # Delete auth credentials
+        supabase.auth.admin.delete_user(current_user_id)
+        
         return {"status": "success", "message": "Account and associated data deleted successfully."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
