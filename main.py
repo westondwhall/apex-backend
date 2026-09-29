@@ -16,6 +16,7 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 # Safety check for environment variables
 if not GEMINI_API_KEY or not SUPABASE_URL or not SUPABASE_KEY:
@@ -24,6 +25,11 @@ if not GEMINI_API_KEY or not SUPABASE_URL or not SUPABASE_KEY:
 # 2. Initialize Clients
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# Admin client for privileged auth operations (e.g. deleting users), requires the service_role key
+supabase_admin: Optional[Client] = (
+    create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) if SUPABASE_SERVICE_ROLE_KEY else None
+)
 
 # Default full equipment string used when user leaves equipment empty/blank
 DEFAULT_FULL_EQUIPMENT = "Full Commercial Gym, Barbell, Dumbbells, Kettlebells, Pull-up Bar, Ruck Plate, Rowing Machine, Assault Bike, Track/Road"
@@ -225,10 +231,12 @@ def delete_user_account(current_user_id: Annotated[str, Depends(get_current_user
         supabase.table("chat_messages").delete().eq("user_id", current_user_id).execute()
         supabase.table("personal_records").delete().eq("user_id", current_user_id).execute()
         supabase.table("agency_benchmarks").delete().eq("user_id", current_user_id).execute()
-        
-        # Delete auth credentials
-        supabase.auth.admin.delete_user(current_user_id)
-        
+
+        # Delete auth credentials (requires service_role key, the anon key lacks admin permissions)
+        if not supabase_admin:
+            raise HTTPException(status_code=500, detail="Server misconfigured: SUPABASE_SERVICE_ROLE_KEY is not set.")
+        supabase_admin.auth.admin.delete_user(current_user_id)
+
         return {"status": "success", "message": "Account and associated data deleted successfully."}
     except Exception as e:
         print(f"ACCOUNT DELETION ERROR: {str(e)}") # <--- This will reveal the exact cause
