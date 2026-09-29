@@ -231,6 +231,7 @@ def delete_user_account(current_user_id: Annotated[str, Depends(get_current_user
         
         return {"status": "success", "message": "Account and associated data deleted successfully."}
     except Exception as e:
+        print(f"ACCOUNT DELETION ERROR: {str(e)}") # <--- This will reveal the exact cause
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- Protected Endpoints ---
